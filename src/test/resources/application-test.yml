@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:${random.uuid};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  kafka:
+    bootstrap-servers: localhost:65535
+    listener:
+      auto-startup: false
+    admin:
+      auto-create: false
+
+app:
+  kafka:
+    create-topics: false
+  outbox:
+    relay-enabled: false

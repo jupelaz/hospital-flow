@@ -1,0 +1,57 @@
+# Mismo manifiesto para cloud (EKS) y para un clúster ligero on-premise en el hospital (k3s).
+# Lo que cambia por entorno va en el ConfigMap/Secret (o en overlays de Kustomize).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bed-management-config
+data:
+  DB_HOST: postgres
+  DB_NAME: beds
+  KAFKA_BOOTSTRAP: kafka:9092
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bed-management
+  labels: { app: bed-management }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: bed-management }
+  template:
+    metadata:
+      labels: { app: bed-management }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: bed-management
+          image: registry.local/hospital-flow/bed-management:0.1.0
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef: { name: bed-management-config }
+            - secretRef: { name: bed-management-db }   # DB_USER / DB_PASSWORD
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { memory: 768Mi }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 40
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bed-management
+spec:
+  selector: { app: bed-management }
+  ports:
+    - port: 80
+      targetPort: 8080
